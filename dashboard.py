@@ -74,10 +74,13 @@ def load_data():
     return rfm
 
 rfm = load_data()
+counts = rfm['Segment'].value_counts()
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────
 st.sidebar.title("Pages")
 page = st.sidebar.radio("", ["Overview","Segment Detail","RFM Scores","Predict","Evaluation"])
+st.sidebar.markdown("---")
+
 # ══════════════════════════════════════════════════════════════════════
 # PAGE 1 — OVERVIEW
 # ══════════════════════════════════════════════════════════════════════
