@@ -50,25 +50,36 @@ def assign_segment(score):
     else:             return 'Lost'
 
 @st.cache_data
+@st.cache_data
 def load_data():
     data_path = 'credit_card_transactions.csv'
+
     if not os.path.exists(data_path):
         if gdown is None:
             raise FileNotFoundError(
-                f"{data_path} is missing and gdown is not installed; install it or provide the CSV file."
+                "Dataset is missing and gdown is not installed."
             )
+
         gdown.download(
-            'https://drive.google.com/file/d/1JvdwHgTwBZZFR5ZTlzTCYyYp_pgT5I5Y/view?usp=sharing',
-            data_path,
-            quiet=False,
+            id="1JvdwHgTwBZZFR5ZTlzTCYyYp_pgT5I5Y",
+            output=data_path,
+            quiet=False
         )
 
     df = pd.read_csv(data_path)
+
     if 'Unnamed: 0' in df.columns:
         df = df.drop(columns=['Unnamed: 0'])
-    df['trans_date_trans_time'] = pd.to_datetime(df['trans_date_trans_time'])
+
+    df['trans_date_trans_time'] = pd.to_datetime(
+        df['trans_date_trans_time']
+    )
+
     df['dob'] = pd.to_datetime(df['dob'], errors='coerce')
-    df['age'] = (df['trans_date_trans_time'] - df['dob']).dt.days / 365.25
+
+    df['age'] = (
+        (df['trans_date_trans_time'] - df['dob']).dt.days / 365.25
+    )
 
     for col in ['amt','age','city_pop']:
         Q1, Q3 = df[col].quantile(0.25), df[col].quantile(0.75)
