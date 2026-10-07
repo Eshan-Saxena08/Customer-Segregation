@@ -1,8 +1,15 @@
+import os
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+
+try:
+    import gdown
+except ImportError:  # pragma: no cover - optional dependency for dataset download
+    gdown = None
 
 st.set_page_config(page_title="Customer Segments — RFM", layout="centered")
 
@@ -44,7 +51,19 @@ def assign_segment(score):
 
 @st.cache_data
 def load_data():
-    df = pd.read_csv('credit_card_transactions.csv')
+    data_path = 'credit_card_transactions.csv'
+    if not os.path.exists(data_path):
+        if gdown is None:
+            raise FileNotFoundError(
+                f"{data_path} is missing and gdown is not installed; install it or provide the CSV file."
+            )
+        gdown.download(
+            'https://drive.google.com/file/d/1JvdwHgTwBZZFR5ZTlzTCYyYp_pgT5I5Y/view?usp=sharing',
+            data_path,
+            quiet=False,
+        )
+
+    df = pd.read_csv(data_path)
     if 'Unnamed: 0' in df.columns:
         df = df.drop(columns=['Unnamed: 0'])
     df['trans_date_trans_time'] = pd.to_datetime(df['trans_date_trans_time'])
