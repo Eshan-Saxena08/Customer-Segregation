@@ -1,5 +1,4 @@
 import os
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -8,7 +7,7 @@ import matplotlib.patches as mpatches
 
 try:
     import gdown
-except ImportError:  # pragma: no cover - optional dependency for dataset download
+except ImportError:
     gdown = None
 
 st.set_page_config(page_title="Customer Segments — RFM", layout="centered")
@@ -50,16 +49,15 @@ def assign_segment(score):
     else:             return 'Lost'
 
 @st.cache_data
-@st.cache_data
 def load_data():
     data_path = 'credit_card_transactions.csv'
 
     if not os.path.exists(data_path):
         if gdown is None:
             raise FileNotFoundError(
-                "Dataset is missing and gdown is not installed."
+                "Dataset is missing and gdown is not installed. "
+                "Run: pip install gdown"
             )
-
         gdown.download(
             id="1JvdwHgTwBZZFR5ZTlzTCYyYp_pgT5I5Y",
             output=data_path,
@@ -67,19 +65,11 @@ def load_data():
         )
 
     df = pd.read_csv(data_path)
-
     if 'Unnamed: 0' in df.columns:
         df = df.drop(columns=['Unnamed: 0'])
-
-    df['trans_date_trans_time'] = pd.to_datetime(
-        df['trans_date_trans_time']
-    )
-
+    df['trans_date_trans_time'] = pd.to_datetime(df['trans_date_trans_time'])
     df['dob'] = pd.to_datetime(df['dob'], errors='coerce')
-
-    df['age'] = (
-        (df['trans_date_trans_time'] - df['dob']).dt.days / 365.25
-    )
+    df['age'] = (df['trans_date_trans_time'] - df['dob']).dt.days / 365.25
 
     for col in ['amt','age','city_pop']:
         Q1, Q3 = df[col].quantile(0.25), df[col].quantile(0.75)
@@ -110,6 +100,14 @@ counts = rfm['Segment'].value_counts()
 st.sidebar.title("Pages")
 page = st.sidebar.radio("", ["Overview","Segment Detail","RFM Scores","Predict","Evaluation"])
 st.sidebar.markdown("---")
+st.sidebar.markdown("**Methodology**")
+st.sidebar.caption("6-segment RFM framework.\nR + F + M total score (3–15) → segment.")
+st.sidebar.markdown("**Segments found**")
+for seg in SEG_ORDER:
+    if seg in counts:
+        color = COLORS[seg]
+        icon  = SEGMENT_META[seg][0]
+        st.sidebar.markdown(f"<span style='color:{color}'>{icon} **{seg}**: {counts[seg]}</span>", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════
 # PAGE 1 — OVERVIEW
@@ -393,7 +391,8 @@ elif page == "Predict":
         if seg not in rfm['Segment'].values:
             continue
         sub = rfm[rfm['Segment']==seg]
-        ax.scatter(sub['RFM_Score'], np.random.uniform(0.2, 0.8, len(sub)),
+        rng = np.random.default_rng(seed=hash(seg) % (2**32))
+        ax.scatter(sub['RFM_Score'], rng.uniform(0.2, 0.8, len(sub)),
                    c=COLORS[seg], alpha=0.35, s=30, edgecolors='none', label=seg)
     ax.scatter(total, 0.5, c=color, s=350, zorder=10,
                edgecolors='black', linewidths=2, marker='*',
