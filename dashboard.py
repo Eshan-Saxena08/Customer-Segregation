@@ -5,10 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
-try:
-    import gdown
-except ImportError:
-    gdown = None
+import requests
 
 st.set_page_config(page_title="Customer Segments — RFM", layout="centered")
 
@@ -53,16 +50,15 @@ def load_data():
     data_path = 'credit_card_transactions.csv'
 
     if not os.path.exists(data_path):
-        if gdown is None:
-            raise FileNotFoundError(
-                "Dataset is missing and gdown is not installed. "
-                "Run: pip install gdown"
-            )
-        gdown.download(
-            id="1JvdwHgTwBZZFR5ZTlzTCYyYp_pgT5I5Y",
-            output=data_path,
-            quiet=False
+        url = (
+            "https://huggingface.co/datasets/EshanSaxena/Bank-Customer-Analysis"
+            "/resolve/main/credit_card_transactions.csv"
         )
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(data_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
 
     df = pd.read_csv(data_path)
     if 'Unnamed: 0' in df.columns:
