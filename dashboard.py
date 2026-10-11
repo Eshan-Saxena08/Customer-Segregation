@@ -1,10 +1,10 @@
-import os
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
+import io
 import requests
 
 st.set_page_config(page_title="Customer Segments — RFM", layout="centered")
@@ -47,20 +47,10 @@ def assign_segment(score):
 
 @st.cache_data
 def load_data():
-    data_path = 'credit_card_transactions.csv'
-
-    if not os.path.exists(data_path):
-        url = (
-            "https://huggingface.co/datasets/EshanSaxena/Bank-Customer-Analysis"
-            "/resolve/main/credit_card_transactions.csv"
-        )
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with open(data_path, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-
-    df = pd.read_csv(data_path)
+    url = "https://eshanjr-dataset.s3.ap-southeast-2.amazonaws.com/credit_card_transactions.csv"
+    response = requests.get(url)
+    response.raise_for_status()
+    df = pd.read_csv(io.StringIO(response.content.decode('utf-8')))
     if 'Unnamed: 0' in df.columns:
         df = df.drop(columns=['Unnamed: 0'])
     df['trans_date_trans_time'] = pd.to_datetime(df['trans_date_trans_time'])
