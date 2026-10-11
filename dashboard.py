@@ -1,11 +1,11 @@
+import os
+import tempfile
+import requests
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-
-import io
-import requests
 
 st.set_page_config(page_title="Customer Segments — RFM", layout="centered")
 
@@ -22,18 +22,36 @@ COLORS = {
 SEG_ORDER = ['Champions', 'Loyal', 'Growing', 'At Risk', 'Dormant', 'Lost']
 
 SEGMENT_META = {
-    'Champions': ('🏆', 'RFM Score 13–15. Bought recently, transact often, spend the most.',
-                  'Reward them. Give early access to new products. They will refer others.'),
-    'Loyal':     ('💙', 'RFM Score 10–12. Spend well and transact consistently.',
-                  'Upsell higher-value products. Ask for referrals. Keep them engaged.'),
-    'Growing':   ('🌱', 'RFM Score 7–9. Active and improving — on the way up.',
-                  'Nurture them with loyalty incentives. Help them grow into Loyal or Champions.'),
-    'At Risk':   ('🚨', 'RFM Score 5–6. Were good customers but activity is declining.',
-                  'Personalised win-back campaign. Remind them of what they loved. Act now.'),
-    'Dormant':   ('😴', 'RFM Score 4. Low across all dimensions. Barely active.',
-                  'One targeted re-engagement offer. Low spend — keep effort minimal.'),
-    'Lost':      ('💔', 'RFM Score 3. Lowest scores on all three dimensions.',
-                  'Minimal effort. One last campaign. Accept if there is no response.'),
+    'Champions': (
+        '🏆',
+        'RFM Score 13–15. Bought recently, transact often, spend the most.',
+        'Reward them. Give early access to new products. They will refer others.'
+    ),
+    'Loyal': (
+        '💙',
+        'RFM Score 10–12. Spend well and transact consistently.',
+        'Upsell higher-value products. Ask for referrals. Keep them engaged.'
+    ),
+    'Growing': (
+        '🌱',
+        'RFM Score 7–9. Active and improving — on the way up.',
+        'Nurture them with loyalty incentives. Help them grow into Loyal or Champions.'
+    ),
+    'At Risk': (
+        '🚨',
+        'RFM Score 5–6. Were good customers but activity is declining.',
+        'Personalised win-back campaign. Remind them of what they loved. Act now.'
+    ),
+    'Dormant': (
+        '😴',
+        'RFM Score 4. Low across all dimensions. Barely active.',
+        'One targeted re-engagement offer. Low spend — keep effort minimal.'
+    ),
+    'Lost': (
+        '💔',
+        'RFM Score 3. Lowest scores on all three dimensions.',
+        'Minimal effort. One last campaign. Accept if there is no response.'
+    )
 }
 
 # ── Segment classification using total RFM score ───────────────────────
@@ -45,38 +63,101 @@ def assign_segment(score):
     elif score == 4:  return 'Dormant'
     else:             return 'Lost'
 
-@st.cache_data
+@st.cache_data(show_spinner="Downloading and processing CSV...")
 def load_data():
-    url = "https://eshanjr-dataset.s3.ap-southeast-2.amazonaws.com/credit_card_transactions.csv"
-    response = requests.get(url)
-    response.raise_for_status()
-    df = pd.read_csv(io.StringIO(response.content.decode('utf-8')))
+    url = (
+        "https://eshanjr-dataset.s3.ap-southeast-2.amazonaws.com/"
+        "credit_card_transactions.csv"
+    )
+
+    data_path = os.path.join(
+        tempfile.gettempdir(),
+        "credit_card_transactions.csv"
+    )
+
+    if not os.path.exists(data_path):
+        temp_path = data_path + ".part"
+
+        try:
+            with requests.get(
+                url,
+                stream=True,
+                timeout=(15, 300)
+            ) as response:
+                response.raise_for_status()
+
+                with open(temp_path, "wb") as f:
+                    for chunk in response.iter_content(
+                        chunk_size=1024 * 1024
+                    ):
+                        if chunk:
+                            f.write(chunk)
+
+            os.replace(temp_path, data_path)
+
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    df = pd.read_csv(data_path)
+
     if 'Unnamed: 0' in df.columns:
         df = df.drop(columns=['Unnamed: 0'])
-    df['trans_date_trans_time'] = pd.to_datetime(df['trans_date_trans_time'])
+
+    df['trans_date_trans_time'] = pd.to_datetime(
+        df['trans_date_trans_time']
+    )
     df['dob'] = pd.to_datetime(df['dob'], errors='coerce')
-    df['age'] = (df['trans_date_trans_time'] - df['dob']).dt.days / 365.25
+    df['age'] = (
+        df['trans_date_trans_time'] - df['dob']
+    ).dt.days / 365.25
 
-    for col in ['amt','age','city_pop']:
+    for col in ['amt', 'age', 'city_pop']:
         Q1, Q3 = df[col].quantile(0.25), df[col].quantile(0.75)
-        IQR    = Q3 - Q1
-        df     = df[(df[col] >= Q1-1.5*IQR) & (df[col] <= Q3+1.5*IQR)]
+        IQR = Q3 - Q1
 
-    ref = df['trans_date_trans_time'].max() + pd.Timedelta(days=1)
+        df = df[
+            (df[col] >= Q1 - 1.5 * IQR) &
+            (df[col] <= Q3 + 1.5 * IQR)
+        ]
+
+    ref = (
+        df['trans_date_trans_time'].max()
+        + pd.Timedelta(days=1)
+    )
+
     rfm = df.groupby('cc_num').agg(
-        Recency   = ('trans_date_trans_time', lambda x: (ref - x.max()).days),
-        Frequency = ('trans_num',  'count'),
-        Monetary  = ('amt',        'sum'),
-        Avg_Amt   = ('amt',        'mean'),
-        Fraud_Rate= ('is_fraud',   'mean'),
+        Recency=(
+            'trans_date_trans_time',
+            lambda x: (ref - x.max()).days
+        ),
+        Frequency=('trans_num', 'count'),
+        Monetary=('amt', 'sum'),
+        Avg_Amt=('amt', 'mean'),
+        Fraud_Rate=('is_fraud', 'mean'),
     ).reset_index()
 
-    # RFM scores 1-5
-    rfm['R_score'] = pd.qcut(rfm['Recency'].rank(method='first'),   q=5, labels=[5,4,3,2,1]).astype(int)
-    rfm['F_score'] = pd.qcut(rfm['Frequency'].rank(method='first'), q=5, labels=[1,2,3,4,5]).astype(int)
-    rfm['M_score'] = pd.qcut(rfm['Monetary'].rank(method='first'),  q=5, labels=[1,2,3,4,5]).astype(int)
-    rfm['RFM_Score'] = rfm['R_score'] + rfm['F_score'] + rfm['M_score']
-    rfm['Segment']   = rfm['RFM_Score'].apply(assign_segment)
+    rfm['R_score'] = pd.qcut(
+        rfm['Recency'].rank(method='first'),
+        q=5, labels=[5, 4, 3, 2, 1]
+    ).astype(int)
+
+    rfm['F_score'] = pd.qcut(
+        rfm['Frequency'].rank(method='first'),
+        q=5, labels=[1, 2, 3, 4, 5]
+    ).astype(int)
+
+    rfm['M_score'] = pd.qcut(
+        rfm['Monetary'].rank(method='first'),
+        q=5, labels=[1, 2, 3, 4, 5]
+    ).astype(int)
+
+    rfm['RFM_Score'] = (
+        rfm['R_score'] + rfm['F_score'] + rfm['M_score']
+    )
+
+    rfm['Segment'] = rfm['RFM_Score'].apply(assign_segment)
+
     return rfm
 
 rfm = load_data()
@@ -85,10 +166,6 @@ counts = rfm['Segment'].value_counts()
 # ── SIDEBAR ───────────────────────────────────────────────────────────
 st.sidebar.title("Pages")
 page = st.sidebar.radio("", ["Overview","Segment Detail","RFM Scores","Predict","Evaluation"])
-st.sidebar.markdown("---")
-st.sidebar.markdown("**Methodology**")
-st.sidebar.caption("6-segment RFM framework.\nR + F + M total score (3–15) → segment.")
-st.sidebar.markdown("**Segments found**")
 for seg in SEG_ORDER:
     if seg in counts:
         color = COLORS[seg]
@@ -278,12 +355,12 @@ elif page == "RFM Scores":
     st.markdown("""
 | Segment | Total RFM Score | What it means |
 |---|---|---|
-| 🏆 Champions | 13 – 15 | Top scores across all three dimensions |
-| 💙 Loyal | 10 – 12 | Consistently high — strong, reliable customers |
-| 🌱 Growing | 7 – 9 | Above average — building momentum |
-| 🚨 At Risk | 5 – 6 | Declining activity — intervention needed |
-| 😴 Dormant | 4 | Barely active across all dimensions |
-| 💔 Lost | 3 | Lowest possible score — churned |
+| Champions | 13 – 15 | Top scores across all three dimensions |
+| Loyal | 10 – 12 | Consistently high — strong, reliable customers |
+| Growing | 7 – 9 | Above average — building momentum |
+| At Risk | 5 – 6 | Declining activity — intervention needed |
+| Dormant | 4 | Barely active across all dimensions |
+| Lost | 3 | Lowest possible score — churned |
 """)
     st.caption("Total score = R + F + M. Range is 3 (worst) to 15 (best). Each band maps to exactly one segment — no overlap.")
 
@@ -483,7 +560,6 @@ elif page == "Evaluation":
     ]
     all_pass = True
     for label, passed in checks:
-        st.write(f"{'✅' if passed else '❌'} {label}")
         if not passed: all_pass = False
     st.markdown("---")
     if all_pass:
