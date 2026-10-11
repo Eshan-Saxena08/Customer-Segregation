@@ -21,38 +21,34 @@ COLORS = {
 
 SEG_ORDER = ['Champions', 'Loyal', 'Growing', 'At Risk', 'Dormant', 'Lost']
 
+
 SEGMENT_META = {
     'Champions': (
-        '🏆',
         'RFM Score 13–15. Bought recently, transact often, spend the most.',
         'Reward them. Give early access to new products. They will refer others.'
     ),
     'Loyal': (
-        '💙',
         'RFM Score 10–12. Spend well and transact consistently.',
         'Upsell higher-value products. Ask for referrals. Keep them engaged.'
     ),
     'Growing': (
-        '🌱',
         'RFM Score 7–9. Active and improving — on the way up.',
         'Nurture them with loyalty incentives. Help them grow into Loyal or Champions.'
     ),
     'At Risk': (
-        '🚨',
         'RFM Score 5–6. Were good customers but activity is declining.',
         'Personalised win-back campaign. Remind them of what they loved. Act now.'
     ),
     'Dormant': (
-        '😴',
         'RFM Score 4. Low across all dimensions. Barely active.',
         'One targeted re-engagement offer. Low spend — keep effort minimal.'
     ),
     'Lost': (
-        '💔',
         'RFM Score 3. Lowest scores on all three dimensions.',
         'Minimal effort. One last campaign. Accept if there is no response.'
     )
 }
+
 
 # ── Segment classification using total RFM score ───────────────────────
 def assign_segment(score):
@@ -169,8 +165,10 @@ page = st.sidebar.radio("", ["Overview","Segment Detail","RFM Scores","Predict",
 for seg in SEG_ORDER:
     if seg in counts:
         color = COLORS[seg]
-        icon  = SEGMENT_META[seg][0]
-        st.sidebar.markdown(f"<span style='color:{color}'>{icon} **{seg}**: {counts[seg]}</span>", unsafe_allow_html=True)
+        st.sidebar.markdown(
+            f"<span style='color:{color}'>**{seg}**: {counts[seg]}</span>",
+            unsafe_allow_html=True
+        )
 
 # ══════════════════════════════════════════════════════════════════════
 # PAGE 1 — OVERVIEW
@@ -187,9 +185,9 @@ if page == "Overview":
         if seg not in rfm['Segment'].values:
             continue
         sub  = rfm[rfm['Segment']==seg]
-        icon, desc, action = SEGMENT_META[seg]
+        desc, action = SEGMENT_META[seg]
         rows.append({
-            "Segment":          f"{icon} {seg}",
+            "Segment":          f"{seg}",
             "Customers":        len(sub),
             "Median Recency":   f"{sub['Recency'].median():.0f} days",
             "Median Frequency": f"{sub['Frequency'].median():,.0f} txns",
@@ -207,16 +205,16 @@ if page == "Overview":
         if seg not in rfm['Segment'].values:
             continue
         sub = rfm[rfm['Segment']==seg]
-        icon, desc, action = SEGMENT_META[seg]
+        desc, action = SEGMENT_META[seg]
         color = COLORS[seg]
-        with st.expander(f"{icon} {seg} — {len(sub)} customers"):
+        with st.expander(f"{seg} — {len(sub)} customers"):
             st.markdown(f"<span style='color:{color};font-weight:500;'>What they look like:</span>", unsafe_allow_html=True)
             st.write(desc)
             c1, c2, c3, c4 = st.columns(4)
-            c1.write(f"📅 **Recency:** {sub['Recency'].median():.0f} days")
-            c2.write(f"🔁 **Transactions:** {sub['Frequency'].median():,.0f}")
-            c3.write(f"💰 **Total spend:** ${sub['Monetary'].median():,.0f}")
-            c4.write(f"💳 **Avg/txn:** ${sub['Avg_Amt'].mean():,.0f}")
+            c1.write(f" **Recency:** {sub['Recency'].median():.0f} days")
+            c2.write(f" **Transactions:** {sub['Frequency'].median():,.0f}")
+            c3.write(f" **Total spend:** ${sub['Monetary'].median():,.0f}")
+            c4.write(f" **Avg/txn:** ${sub['Avg_Amt'].mean():,.0f}")
             st.markdown(f"<span style='color:{color};font-weight:500;'>What the bank should do:</span>", unsafe_allow_html=True)
             st.success(action)
 
@@ -267,9 +265,9 @@ elif page == "Segment Detail":
                           format_func=lambda s: f"{SEGMENT_META[s][0]} {s} ({counts.get(s,0)} customers)")
     subset = rfm[rfm['Segment']==chosen]
     color  = COLORS[chosen]
-    icon, desc, action = SEGMENT_META[chosen]
+    desc, action = SEGMENT_META[chosen]
 
-    st.markdown(f"<h3 style='color:{color}'>{icon} {chosen}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color:{color}'> {chosen}</h3>", unsafe_allow_html=True)
     st.write(desc)
     st.success(f"**Bank action:** {action}")
     st.markdown("---")
@@ -432,14 +430,14 @@ elif page == "Predict":
     total = r_input + f_input + m_input
     result = assign_segment(total)
     color  = COLORS[result]
-    icon, desc, action = SEGMENT_META[result]
+    desc, action = SEGMENT_META[result]
 
     st.markdown("---")
     st.markdown(
         f"<div style='background:{color}18;border-left:4px solid {color};"
         f"border-radius:8px;padding:1rem 1.25rem;'>"
         f"<div style='font-size:12px;color:{color};font-weight:500;text-transform:uppercase;margin-bottom:4px;'>Predicted Segment</div>"
-        f"<div style='font-size:28px;font-weight:500;color:{color};'>{icon} {result}</div>"
+        f"<div style='font-size:28px;font-weight:500;color:{color};'> {result}</div>"
         f"<div style='font-size:13px;color:#666;margin-top:6px;'>R={r_input}  F={f_input}  M={m_input}  Total={total}</div>"
         f"</div>", unsafe_allow_html=True
     )
@@ -484,8 +482,7 @@ elif page == "Predict":
         t = r+f+m
         seg_ex = assign_segment(t)
         col_ex = COLORS[seg_ex]
-        icon_ex = SEGMENT_META[seg_ex][0]
-        st.write(f"**{label}** (R={r}, F={f}, M={m}, Total={t}) → {icon_ex} **{seg_ex}**")
+        f"**{label}** (R={r}, F={f}, M={m}, Total={t}) → **{seg_ex}**"
 
 # ══════════════════════════════════════════════════════════════════════
 # PAGE 5 — EVALUATION
